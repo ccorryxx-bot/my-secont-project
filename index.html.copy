@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CODE MASTER V6 - RELIABLE COPY</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap');
+        
+        :root {
+            --bg-dark: #020617;
+            --accent: #6366f1;
+            --card-bg: #0f172a;
+        }
+
+        body { 
+            background-color: var(--bg-dark); 
+            font-family: 'Inter', sans-serif; 
+            color: #f8fafc; 
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .fixed-top {
+            flex-shrink: 0;
+            z-index: 50;
+            background: var(--bg-dark);
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .scroll-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-bottom: 80px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .code-row {
+            transition: all 0.2s ease-out;
+        }
+
+        .active-glow {
+            border-color: var(--accent) !important;
+            background: rgba(99, 102, 241, 0.1) !important;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+            transform: scale(1.02);
+        }
+
+        .done-dim {
+            opacity: 0.2;
+            filter: grayscale(1);
+        }
+
+        .btn-press:active {
+            transform: scale(0.95);
+        }
+
+        /* Copy Success Animation */
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .copy-anim {
+            animation: pulse-green 0.6s ease-out;
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <!-- Header & Controller (Fixed) -->
+    <div class="fixed-top w-full max-w-md mx-auto pb-4">
+        <header class="flex justify-between items-center py-4">
+            <div>
+                <h1 class="text-2xl font-black italic text-indigo-500 tracking-tighter">CODE MASTER <span class="text-white">V6</span></h1>
+                <p class="text-[8px] font-bold text-slate-500 tracking-[0.3em] uppercase">Reliable Clipboard System</p>
+            </div>
+            <button onclick="resetAll()" class="p-2 text-slate-500 hover:text-red-500 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+        </header>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 gap-2 mb-4">
+            <div class="bg-slate-900/50 border border-slate-800 p-3 rounded-2xl text-center">
+                <span class="text-[8px] font-bold text-slate-500 block mb-1">TOTAL</span>
+                <span id="totalNum" class="text-xl font-black">0</span>
+            </div>
+            <div class="bg-slate-900/50 border border-slate-800 p-3 rounded-2xl text-center">
+                <span class="text-[8px] font-bold text-green-500 block mb-1">DONE</span>
+                <span id="doneNum" class="text-xl font-black text-green-500">0</span>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <textarea id="inputCodes" class="w-full h-20 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-indigo-300 focus:border-indigo-500 outline-none mb-3 resize-none" placeholder="Paste codes here (line by line)..."></textarea>
+        
+        <!-- Buttons -->
+        <div class="grid grid-cols-2 gap-2 mb-3">
+            <button onclick="loadData()" class="h-12 bg-slate-800 rounded-xl font-black text-[10px] tracking-widest btn-press">LOAD DATA</button>
+            <button onclick="forceClear()" class="h-12 bg-red-900/20 border border-red-500/30 text-red-500 rounded-xl font-black text-[10px] tracking-widest btn-press">CLEAR BOX</button>
+        </div>
+
+        <button id="mainCopyBtn" onclick="copyNext()" class="w-full h-16 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black text-sm tracking-[0.2em] shadow-lg shadow-indigo-500/20 btn-press flex items-center justify-center gap-3">
+            <span>COPY NEXT</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+    </div>
+
+    <!-- Scrollable List -->
+    <div id="list" class="scroll-area w-full max-w-md mx-auto pt-4 no-scrollbar">
+        <div class="text-center py-20 opacity-20 italic text-sm">No codes loaded yet...</div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full text-[10px] font-black shadow-2xl scale-0 transition-transform duration-200 z-[100] flex items-center gap-2">
+        <div id="toastDot" class="w-2 h-2 rounded-full"></div>
+        <span id="toastMsg">COPIED</span>
+    </div>
+
+    <script>
+        let codes = [];
+        let current = -1;
+
+        function loadData() {
+            const raw = document.getElementById('inputCodes').value;
+            codes = raw.split('\n').map(s => s.trim()).filter(s => s !== "");
+            
+            if (codes.length === 0) {
+                showToast("Please input some codes", "red");
+                return;
+            }
+
+            current = -1;
+            refreshStats();
+            renderCodes();
+            showToast(`${codes.length} Codes Loaded`, "green");
+            document.getElementById('list').scrollTop = 0;
+        }
+
+        function renderCodes() {
+            const container = document.getElementById('list');
+            container.innerHTML = "";
+            
+            codes.forEach((code, i) => {
+                const isDone = i <= current;
+                const isActive = i === current + 1;
+                
+                const div = document.createElement('div');
+                div.id = `code-${i}`;
+                div.className = `code-row flex items-center justify-between p-4 mb-3 border border-slate-800 rounded-2xl bg-slate-900/40 ${isDone ? 'done-dim' : ''} ${isActive ? 'active-glow' : ''}`;
+                
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-[9px] font-bold text-slate-600">${i+1}</span>
+                        <span class="font-mono font-bold tracking-widest ${isActive ? 'text-indigo-400' : 'text-slate-300'}">${code}</span>
+                    </div>
+                    ${isActive ? '<span class="text-[8px] font-black text-indigo-500 animate-pulse">READY</span>' : ''}
+                    ${isDone ? '<svg class="text-green-500" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : ''}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function copyToClipboard(text) {
+            // Method 1: Modern API
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (err) {
+                    console.error("Modern API failed", err);
+                }
+            }
+
+            // Method 2: Fallback (Hidden Textarea)
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            textArea.style.top = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return successful;
+            } catch (err) {
+                document.body.removeChild(textArea);
+                return false;
+            }
+        }
+
+        async function copyNext() {
+            if (codes.length === 0) return;
+            if (current >= codes.length - 1) {
+                showToast("All codes processed!", "indigo");
+                return;
+            }
+
+            current++;
+            const target = codes[current];
+            const success = await copyToClipboard(target);
+
+            if (success) {
+                const btn = document.getElementById('mainCopyBtn');
+                btn.classList.add('copy-anim');
+                setTimeout(() => btn.classList.remove('copy-anim'), 600);
+                
+                showToast(`COPIED: ${target}`, "green");
+                refreshStats();
+                renderCodes();
+
+                // Auto Scroll
+                const nextRow = document.getElementById(`code-${current}`);
+                if (nextRow) nextRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                showToast("Copy Failed!", "red");
+            }
+        }
+
+        function forceClear() {
+            // Space overwrite trick if game supports, or just empty for clearing
+            copyToClipboard("");
+            showToast("Clipboard Cleared", "slate");
+        }
+
+        function refreshStats() {
+            document.getElementById('totalNum').innerText = codes.length;
+            document.getElementById('doneNum').innerText = current + 1;
+        }
+
+        function showToast(msg, color) {
+            const t = document.getElementById('toast');
+            const dot = document.getElementById('toastDot');
+            const colors = {
+                green: '#22c55e',
+                red: '#ef4444',
+                indigo: '#6366f1',
+                slate: '#64748b'
+            };
+            
+            document.getElementById('toastMsg').innerText = msg.toUpperCase();
+            dot.style.backgroundColor = colors[color] || 'white';
+            
+            t.classList.remove('scale-0');
+            t.classList.add('scale-100');
+            setTimeout(() => {
+                t.classList.remove('scale-100');
+                t.classList.add('scale-0');
+            }, 1000);
+        }
+
+        function resetAll() {
+            codes = [];
+            current = -1;
+            document.getElementById('inputCodes').value = "";
+            refreshStats();
+            document.getElementById('list').innerHTML = '<div class="text-center py-20 opacity-20 italic text-sm">System Reset</div>';
+        }
+    </script>
+</body>
+</html>
+
